@@ -1,127 +1,48 @@
 using TestingLib;
 using static System.Console;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 
 class Program
 {
-    static int _total;
-    static int _passed;
-    
     static void Main(string[] args)
     {
-        var usd = new Currency("USD", "$", 2);
-        var eur = new Currency("EUR", "€", 2);
-        var cny = new Currency("CNY", "¥", 2);
-        var gbp = new Currency("GBP", "£", 2);
-        var rub = new Currency("RUB", "₽", 2);
-
-        var wallet = new Wallet();
-        var money = new Money(10, usd);
-        var money2 = new Money(5, usd);
-        var money3 = new Money(4, cny);
-        var money4 = new Money(10, gbp);
-        var money5 = new Money(100, rub);
-        var money6 = new Money(400, eur);
-
-        var a = new Money(10, usd);
-        var b = new Money(5, usd);
-        var c = new Money(15, eur);
-        var d = new Money(20, eur);
-
-        wallet.BalanceChanged += ChangerBalanceNotify;
-
-        Throws<InvalidOperationException>("USD + EUR", () => { var _ = a + c; });
-        Throws<InvalidOperationException>("USD - EUR", () => { var _ = a - c; });
-        Throws<InvalidOperationException>("EUR - USD", () => { var _ = c - b; });        
-        Throws<InvalidOperationException>("USD - EUR", () => { var _ = a - d; });
-
-        wallet.Add(money);
-        Check("Count после первого Add", 1, wallet.Count);
-        wallet += money2;
-        Check("Count после второго Add той же валюты", 1, wallet.Count);
-        wallet.Remove(a);
-        wallet.Remove(b);
-        Check("Снять весь баланс", new Money(0, usd), wallet[usd]);
-        Throws<InsufficientFundsException>("0 EUR balance - 15 EUR", () => wallet.Remove(c));
-        wallet.Add(money3);
-        wallet.Add(money4);
-        wallet.Add(money5);
-        wallet.Add(money6);
-        Throws<InsufficientFundsException>("€400 - €500", () => wallet.Remove(new Money(500, eur)));
-        Check("Count с пятью валютами", 5, wallet.Count);
-
-        Check("Баланс USD", new Money(0, usd), wallet[usd]);
-
-        Check("a - b", new Money(5, usd), a - b);
-        Check("a + b", new Money(15, usd), a + b);
-        Check("$10 - $10 = $0", new Money(0, usd), a - a);
-
-        Throws<InvalidOperationException>("$10 - $20", () => { var _ = new Money(10, usd) - new Money(20, usd); } );
-
-        Check("2 * USD",new Money(20, usd), 2 * a);
-        Check("USD * 2", new Money(20, usd), a * 2);
-        Check("10$ > 5$", true, a > b );
-        Check("USD 10.005 => 10.00 ToEven", new Money(10.005m, usd), new Money(10m, usd));
-        Check("USD 10.015 => 10.02 ToEven", new Money(10.015m, usd), new Money(10.02m, usd));
-        Throws<ArgumentOutOfRangeException>("USD = -1", () => { var _ = new Money(-1, usd); });
-        Throws<ArgumentException>("USD is US", () => { var _ = new Currency("US", "€", 2); });
-        Check("usd == USD", true, new Currency("usd", "$", 2) == usd);
-        
-        WriteLine($"Total test: {_total}");
-        WriteLine($"Passed test: {_passed}");
-    }
-
-    static void ChangerBalanceNotify(Money other)
-    {
-        WriteLine($"Баланс валюты {other.Currency} изменился, теперь он составляет: {other}");
-    }
-
-    static void Throws<TException>(string name, Action action)
-        where TException : Exception
-    {
-        _total++;
-        try
+        ObservableCollection<Person> people = new ObservableCollection<Person>()
         {
-            action();
-            Console.ForegroundColor = ConsoleColor.Red;
-            WriteLine($"FAIL: expected exception, but it wasn't");
-            WriteLine($"{name}\n");
-            Console.ResetColor();
-        }
-        catch (TException ex)
+            new Person("Tom"),
+            new Person("Sam"),
+        };
+
+        people.CollectionChanged += People_CollectionChanged;
+
+        people.Add(new Person("Bob"));
+        people.RemoveAt(1);
+        people[0] = new Person("Eugene");
+
+        WriteLine("\nСписок пользователей:");
+        foreach (var person in people)
         {
-            Console.ForegroundColor = ConsoleColor.Green;
-            WriteLine($"Exception {ex.GetType().Name} is PASS");
-            WriteLine($"{name}\n");
-            Console.ResetColor();
-            _passed++;
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            WriteLine($"FAIL: expected {typeof(TException).Name}, got {ex.GetType().Name}");
-            WriteLine($"{name}\n");
-            Console.ResetColor();
+            WriteLine(person.Name);
         }
     }
 
-    static void Check<T>(string name, T expected, T actual)
-        where T : IEquatable<T>
+    static void People_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        _total++;
-        if (!expected.Equals(actual))
+        switch (e.Action)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            WriteLine($"FAIL: expected {expected}, got {actual}");
-            WriteLine($"{name}\n");
-            Console.ResetColor();
-        }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            WriteLine($"PASS: expected {expected}, got {actual}");
-            WriteLine($"{name}\n");
-            Console.ResetColor();
-            _passed++;
+            case NotifyCollectionChangedAction.Add: 
+                if (e.NewItems?[0] is Person newPerson)
+                    WriteLine($"Добавлен новый объект {newPerson.Name}");
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                if (e.OldItems?[0] is Person oldPerson)
+                    WriteLine($"Удален объект {oldPerson.Name}");
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                if (e.NewItems?[0] is Person replacingPerson &&
+                    e.OldItems?[0] is Person replacedPerson)
+                    WriteLine($"Объект {replacedPerson.Name} заменен объектом {replacingPerson.Name}");
+                break;
         }
     }
 }
